@@ -1,0 +1,92 @@
+blueprint:
+  name: RGBCCT_SYNCER
+  description: >
+    Синхронизация яркости, температуры цвета и цвета (hs_color) между источником и группой устройств.
+    Статус включения/выключения и скорость вентилятора не синхронизируются.
+  domain: automation
+  input:
+    source_entity:
+      name: Source entity
+      description: Сущность-источник (лампа)
+      selector:
+        entity: {}
+    group_entity:
+      name: Group entity
+      description: Группа связанных сущностей
+      selector:
+        entity: {}
+    delay_miliseconds:
+      name: Delay
+      description: Задержка в миллисекундах между изменениями
+      default: 500
+      selector:
+        number:
+          min: 0
+          max: 5000
+          unit_of_measurement: milliseconds
+          mode: box
+
+mode: restart
+max_exceeded: silent
+
+variables:
+  source_entity: !input source_entity
+  group_entity: !input group_entity
+  linked_entities: "{{ expand(group_entity) | map(attribute='entity_id') | list }}"
+
+triggers:
+  - platform: state
+    id: set_brightness
+    entity_id: !input source_entity
+    attribute: brightness
+
+  - platform: state
+    id: set_color_temp
+    entity_id: !input source_entity
+    attribute: color_temp
+
+  - platform: state
+    id: set_color
+    entity_id: !input source_entity
+    attribute: hs_color
+
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: set_brightness
+        sequence:
+          - variables:
+              set_light_brightness: "{{ trigger.to_state.attributes.brightness }}"
+          - service: light.turn_on
+            data:
+              entity_id: "{{ linked_entities | reject('eq', trigger.entity_id) | list }}"
+              brightness: "{{ set_light_brightness }}"
+          - delay:
+              milliseconds: !input delay_miliseconds
+
+      - conditions:
+          - condition: trigger
+            id: set_color_temp
+        sequence:
+          - variables:
+              set_light_color_temp: "{{ trigger.to_state.attributes.color_temp }}"
+          - service: light.turn_on
+            data:
+              entity_id: "{{ linked_entities | reject('eq', trigger.entity_id) | list }}"
+              color_temp: "{{ set_light_color_temp }}"
+          - delay:
+              milliseconds: !input delay_miliseconds
+
+      - conditions:
+          - condition: trigger
+            id: set_color
+        sequence:
+          - variables:
+              set_light_color: "{{ trigger.to_state.attributes.hs_color }}"
+          - service: light.turn_on
+            data:
+              entity_id: "{{ linked_entities | reject('eq', trigger.entity_id) | list }}"
+              hs_color: "{{ set_light_color }}"
+          - delay:
+              milliseconds: !input delay_miliseconds
