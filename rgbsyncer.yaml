@@ -1,56 +1,70 @@
 blueprint:
-  name: RGBCCT_SYNCER
-  description: >
-    Синхронизация яркости, температуры цвета и цвета (hs_color) между источником и группой устройств.
-    Статус включения/выключения и скорость вентилятора не синхронизируются.
+  name: RGBSYNCER (Brightness + Color Temp + Color)
+  description: >-
+    [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Firzayev%2Firzayev-ha-blueprints%2Frefs%2Fheads%2Fmain%2Fha-blueprint-rgbsyncer.yaml)
+
+    **RGBSYNCER v1.4-lite** 🎨
+
+    This blueprint syncs only the following attributes between multiple entities:
+      - Brightness
+      - Color temperature
+      - Color (hs_color)
+
+    **NOTE**: It does NOT sync:
+      - ON/OFF state
+      - Fan speeds
+
+    **CHANGELOG:**
+      - 1.4-lite: (2025-08-27)
+        - Removed ON/OFF and fan speed sync
+        - Kept brightness, color_temp, hs_color
+
   domain: automation
   input:
-    source_entity:
-      name: Source entity
-      description: Сущность-источник (лампа)
+    linked_entity:
+      name: Linked Entities
+      description: Entities whose attributes (brightness, color_temp, hs_color) will be synced.
       selector:
-        entity: {}
-    group_entity:
-      name: Group entity
-      description: Группа связанных сущностей
-      selector:
-        entity: {}
+        entity:
+          multiple: true
     delay_miliseconds:
       name: Delay
-      description: Задержка в миллисекундах между изменениями
-      default: 500
+      description: Delay between updates to linked entities
       selector:
         number:
           min: 0
-          max: 5000
+          max: 1000
           unit_of_measurement: milliseconds
           mode: box
+      default: 200
 
-mode: restart
+mode: single
 max_exceeded: silent
 
 variables:
-  source_entity: !input source_entity
-  group_entity: !input group_entity
-  linked_entities: "{{ expand(group_entity) | map(attribute='entity_id') | list }}"
+  linked_entities: !input linked_entity
 
-triggers:
+trigger:
   - platform: state
     id: set_brightness
-    entity_id: !input source_entity
+    entity_id: !input linked_entity
     attribute: brightness
 
   - platform: state
     id: set_color_temp
-    entity_id: !input source_entity
+    entity_id: !input linked_entity
     attribute: color_temp
 
   - platform: state
     id: set_color
-    entity_id: !input source_entity
+    entity_id: !input linked_entity
     attribute: hs_color
 
-actions:
+condition:
+  - condition: template
+    value_template: "{{ trigger.to_state.context.id != this.context.id }}"
+
+action:
   - choose:
       - conditions:
           - condition: trigger
